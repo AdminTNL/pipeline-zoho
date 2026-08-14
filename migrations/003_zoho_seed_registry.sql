@@ -1,0 +1,56 @@
+-- ════════════════════════════════════════════════════════════════
+-- Pipeline Zoho Forms → Supabase — cadastro dos forms existentes
+-- ════════════════════════════════════════════════════════════════
+-- TEMPLATE. Preencha com os forms reais do Zoho e rode no SQL Editor.
+--
+-- Adicionar um form novo = INSERT de uma linha aqui. Nada de código.
+--
+-- Regras do `mapeamento`:
+--   "Campo_No_Zoho": "chave_padronizada"                          → de-para direto
+--   "Campo_No_Zoho": {"campo": "chave_padronizada", "transform": "only_digits"}
+--   "Campo_No_Zoho": {"campo": "chave_padronizada", "transform": "concat", "with": "Outro_Campo"}
+--
+-- Transforms disponíveis: only_digits, to_float, to_int, trim, lower, upper, concat
+--
+-- `required` (jsonb): lista de chaves PADRONIZADAS obrigatórias.
+--   Default ["nome","telefone"]. Forms sem nome/telefone usam '[]'.
+-- `file_fields` (jsonb): campos do payload que são uploads de arquivo.
+--   Ex.: '["foto_casa"]'. O n8n baixa do Google Drive e salva no bucket.
+--
+-- form_id = o `form_link_name` do form no Zoho (não é o "Form ID" numérico).
+--   Ache em: Zoho Forms → abrir o form → Form Properties → "Link Name"
+--   (ou na URL de compartilhamento: .../form/<form_link_name>).
+-- ════════════════════════════════════════════════════════════════
+
+-- Exemplo 1 — form com nome + telefone (núcleo padrão):
+-- INSERT INTO zoho_form_registry (form_id, nome, form_family, mapeamento) VALUES
+-- (
+--   'RascunhoBrasilAntenado',
+--   'Brasil Antenado',
+--   'brasil_antenado',
+--   '{
+--     "nome": {"campo": "nome", "transform": "concat", "with": "sobrenome"},
+--     "telefone": {"campo": "telefone", "transform": "only_digits"},
+--     "Cidade": "localizacao",
+--     "GPS_Lat": {"campo": "latitude", "transform": "to_float"},
+--     "GPS_Long": {"campo": "longitude", "transform": "to_float"}
+--   }'::jsonb
+-- );
+
+-- Exemplo 2 — form SEM nome, telefone opcional, com foto (upload):
+-- INSERT INTO zoho_form_registry (form_id, nome, form_family, mapeamento, required, file_fields) VALUES
+-- (
+--   'CoberturaPECompleto21',
+--   'Cobertura PE',
+--   'cobertura_pe',
+--   '{
+--     "submitters_latitude": {"campo": "latitude", "transform": "to_float"},
+--     "submitters_longitude": {"campo": "longitude", "transform": "to_float"},
+--     "submitters_location": "localizacao"
+--   }'::jsonb,
+--   '[]'::jsonb,               -- aceita tudo (sem nome/telefone obrigatórios)
+--   '["foto_casa"]'::jsonb     -- campo de upload
+-- );
+
+-- Se um form for recriado periodicamente com o mesmo shape, reutilize o
+-- mesmo form_family e a view específica continua funcionando.

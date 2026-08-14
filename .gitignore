@@ -1,0 +1,14 @@
+# Dependências
+node_modules/
+
+# Segredos / ambiente
+.env
+.env.*
+!.env.example
+
+# Artefatos de build
+dist/
+.next/
+
+# Sistema
+.DS_Store

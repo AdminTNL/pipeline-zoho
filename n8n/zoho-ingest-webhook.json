@@ -1,0 +1,248 @@
+{
+  "name": "Zoho Forms Ingest (Webhook)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "zoho-forms-ingest",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -380,
+        -200
+      ],
+      "name": "Webhook",
+      "webhookId": "zoho-forms-ingest"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $json.body || $json || {};\n\n// form_id: prefira o query param da URL do webhook (?form_id=...).\nconst formId =\n  ($json.query && $json.query.form_id) ||\n  body.form_link_name ||\n  body.form_id ||\n  'CADASTRE_O_FORM_ID';\n\nfunction parseZohoDate(s) {\n  if (!s) return null;\n  const m = String(s).match(/(\\d{1,2})-([A-Za-z]{3})-(\\d{4})\\s+(\\d{1,2}):(\\d{2}):(\\d{2})/);\n  if (!m) return null;\n  const months = { Jan: 0, Feb: 1, Mar: 2, Apr: 3, May: 4, Jun: 5, Jul: 6, Aug: 7, Sep: 8, Oct: 9, Nov: 10, Dec: 11 };\n  return new Date(Date.UTC(+m[3], months[m[2]], +m[1], +m[4], +m[5], +m[6])).toISOString();\n}\n\nreturn [{\n  json: {\n    form_id: formId,\n    zoho_submission_id: null,\n    submitted_at: parseZohoDate(body.Added_Time || body.added_time),\n    payload: body,\n    source: 'webhook'\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        0,
+        -200
+      ],
+      "name": "Extract submission"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://database.tnledu.shop/rest/v1/rpc/zoho_ingest_submission",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "text"
+            }
+          }
+        },
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json) }}"
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        380,
+        -200
+      ],
+      "name": "Ingest (RPC)",
+      "credentials": {
+        "supabaseApi": {
+          "id": "2s75u9F7plz4ovFN",
+          "name": "Supabase account"
+        }
+      },
+      "retryOnFail": true,
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=https://database.tnledu.shop/rest/v1/zoho_form_registry?select=file_fields&form_id=eq.{{ $json.form_id }}",
+        "options": {},
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi"
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        0,
+        0
+      ],
+      "name": "Get form config",
+      "credentials": {
+        "supabaseApi": {
+          "id": "2s75u9F7plz4ovFN",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const extract = $('Extract submission').first().json;\nconst payload = extract.payload || {};\nconst formId = extract.form_id;\n\n// 'Get form config' pode vir como objeto unico (json) ou array de linhas.\nlet fileFields = [];\nconst cfg = $json;\nif (Array.isArray(cfg)) {\n  fileFields = (cfg[0] && cfg[0].file_fields) || [];\n} else if (cfg && Array.isArray(cfg.file_fields)) {\n  fileFields = cfg.file_fields;\n}\n\n// extrai o file_id da URL do Google Drive\n// ex.: https://drive.google.com/file/d/<FILE_ID>/view?usp=drivesdk\nfunction extractFileId(url) {\n  const m = String(url).match(/\\/file\\/d\\/([^\\/?]+)/);\n  return m ? m[1] : null;\n}\n\nconst items = [];\nfor (const field of fileFields) {\n  const val = payload[field];\n  if (!val) continue;\n  const urls = Array.isArray(val) ? val : [val];\n  for (const url of urls) {\n    const fileId = extractFileId(url);\n    if (!fileId) continue;\n    items.push({\n      json: {\n        form_id: formId,\n        field: field,\n        file_id: fileId\n      }\n    });\n  }\n}\n\nreturn items;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        340,
+        0
+      ],
+      "name": "Prepare photos"
+    },
+    {
+      "parameters": {
+        "batchSize": 1,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        680,
+        0
+      ],
+      "name": "Loop over photos"
+    },
+    {
+      "parameters": {
+        "operation": "download",
+        "fileId": {
+          "__rl": true,
+          "value": "={{ $json.file_id }}",
+          "mode": "id"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        1020,
+        0
+      ],
+      "name": "Download photo",
+      "onError": "continueErrorOutput",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "mJD5RTaU4QynfvNU",
+          "name": "Google Drive account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://database.tnledu.shop/storage/v1/object/zoho-anexos/{{ $('Loop over photos').item.json.form_id }}/{{ $('Loop over photos').item.json.file_id }}",
+        "options": {},
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendBody": true,
+        "contentType": "binaryData",
+        "inputDataFieldName": "data"
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        1360,
+        0
+      ],
+      "name": "Upload photo",
+      "credentials": {
+        "supabaseApi": {
+          "id": "2s75u9F7plz4ovFN",
+          "name": "Supabase account"
+        }
+      },
+      "onError": "continueErrorOutput"
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Extract submission",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract submission": {
+      "main": [
+        [
+          {
+            "node": "Ingest (RPC)",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Get form config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get form config": {
+      "main": [
+        [
+          {
+            "node": "Prepare photos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare photos": {
+      "main": [
+        [
+          {
+            "node": "Loop over photos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop over photos": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Download photo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download photo": {
+      "main": [
+        [
+          {
+            "node": "Upload photo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upload photo": {
+      "main": [
+        [
+          {
+            "node": "Loop over photos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}
