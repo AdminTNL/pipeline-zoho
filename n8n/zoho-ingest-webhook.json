@@ -1,5 +1,4 @@
 {
-  "name": "Zoho Forms Ingest (Webhook)",
   "nodes": [
     {
       "parameters": {
@@ -10,11 +9,12 @@
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2.1,
       "position": [
-        -380,
-        -200
+        -1296,
+        176
       ],
       "name": "Webhook",
-      "webhookId": "zoho-forms-ingest"
+      "webhookId": "zoho-forms-ingest",
+      "id": "aa92ce71-bd0f-4d7e-8177-8d8437d18a14"
     },
     {
       "parameters": {
@@ -23,59 +23,61 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        0,
-        -200
+        -912,
+        176
       ],
-      "name": "Extract submission"
+      "name": "Extract submission",
+      "id": "3981d36c-b7e3-42f8-b67e-a1a53a6fb5fb"
     },
     {
       "parameters": {
         "method": "POST",
         "url": "https://database.tnledu.shop/rest/v1/rpc/zoho_ingest_submission",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json) }}",
         "options": {
           "response": {
             "response": {
               "responseFormat": "text"
             }
           }
-        },
-        "authentication": "predefinedCredentialType",
-        "nodeCredentialType": "supabaseApi",
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify($json) }}"
+        }
       },
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.3,
       "position": [
-        380,
-        -200
+        -544,
+        176
       ],
       "name": "Ingest (RPC)",
+      "retryOnFail": true,
+      "id": "d74c1f74-b829-401b-8c3c-db52388270f5",
       "credentials": {
         "supabaseApi": {
           "id": "2s75u9F7plz4ovFN",
           "name": "Supabase account"
         }
       },
-      "retryOnFail": true,
       "onError": "continueErrorOutput"
     },
     {
       "parameters": {
-        "method": "GET",
         "url": "=https://database.tnledu.shop/rest/v1/zoho_form_registry?select=file_fields&form_id=eq.{{ $json.form_id }}",
-        "options": {},
         "authentication": "predefinedCredentialType",
-        "nodeCredentialType": "supabaseApi"
+        "nodeCredentialType": "supabaseApi",
+        "options": {}
       },
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.3,
       "position": [
-        0,
-        0
+        -912,
+        384
       ],
       "name": "Get form config",
+      "id": "66dfa02c-3c86-4d46-b21d-4f1c62de51d4",
       "credentials": {
         "supabaseApi": {
           "id": "2s75u9F7plz4ovFN",
@@ -90,23 +92,24 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        340,
-        0
+        -544,
+        384
       ],
-      "name": "Prepare photos"
+      "name": "Prepare photos",
+      "id": "515dd278-5061-4b81-9f27-321f17600cb2"
     },
     {
       "parameters": {
-        "batchSize": 1,
         "options": {}
       },
       "type": "n8n-nodes-base.splitInBatches",
       "typeVersion": 3,
       "position": [
-        680,
-        0
+        -208,
+        384
       ],
-      "name": "Loop over photos"
+      "name": "Loop over photos",
+      "id": "a458ccab-09fb-4d5c-9ba4-8240450ede88"
     },
     {
       "parameters": {
@@ -121,36 +124,38 @@
       "type": "n8n-nodes-base.googleDrive",
       "typeVersion": 3,
       "position": [
-        1020,
-        0
+        112,
+        400
       ],
       "name": "Download photo",
-      "onError": "continueErrorOutput",
+      "id": "1d843f5a-0a5f-4184-b82c-155ac5d25950",
       "credentials": {
         "googleDriveOAuth2Api": {
           "id": "mJD5RTaU4QynfvNU",
           "name": "Google Drive account 2"
         }
-      }
+      },
+      "onError": "continueErrorOutput"
     },
     {
       "parameters": {
         "method": "POST",
         "url": "=https://database.tnledu.shop/storage/v1/object/zoho-anexos/{{ $('Loop over photos').item.json.form_id }}/{{ $('Loop over photos').item.json.file_id }}",
-        "options": {},
         "authentication": "predefinedCredentialType",
         "nodeCredentialType": "supabaseApi",
         "sendBody": true,
         "contentType": "binaryData",
-        "inputDataFieldName": "data"
+        "inputDataFieldName": "data",
+        "options": {}
       },
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.3,
       "position": [
-        1360,
-        0
+        432,
+        400
       ],
       "name": "Upload photo",
+      "id": "930ccf45-3c95-46ea-8f26-e06f867853fa",
       "credentials": {
         "supabaseApi": {
           "id": "2s75u9F7plz4ovFN",
@@ -158,6 +163,31 @@
         }
       },
       "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "operation": "deleteFile",
+        "fileId": {
+          "__rl": true,
+          "value": "={{ $('Download photo').first().json.file_id }}",
+          "mode": "id"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        816,
+        416
+      ],
+      "id": "af1fd25e-2e44-4e10-a9b1-6bbd465e4e6d",
+      "name": "Delete a file",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "mJD5RTaU4QynfvNU",
+          "name": "Google Drive account 2"
+        }
+      }
     }
   ],
   "connections": {
@@ -230,10 +260,35 @@
             "type": "main",
             "index": 0
           }
+        ],
+        [
+          {
+            "node": "Loop over photos",
+            "type": "main",
+            "index": 0
+          }
         ]
       ]
     },
     "Upload photo": {
+      "main": [
+        [
+          {
+            "node": "Delete a file",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Loop over photos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Delete a file": {
       "main": [
         [
           {
@@ -244,5 +299,54 @@
         ]
       ]
     }
+  },
+  "pinData": {
+    "Webhook": [
+      {
+        "headers": {
+          "host": "webhookn8n.tnledu.shop",
+          "user-agent": "Zoho.com",
+          "content-length": "681",
+          "accept": "application/json",
+          "content-type": "application/json",
+          "x-forwarded-for": "136.143.177.60",
+          "x-forwarded-host": "webhookn8n.tnledu.shop",
+          "x-forwarded-port": "443",
+          "x-forwarded-proto": "https",
+          "x-forwarded-server": "4cc3e66e18f8",
+          "x-real-ip": "136.143.177.60",
+          "zsec_user_import_url": "true",
+          "accept-encoding": "gzip"
+        },
+        "params": {},
+        "query": {
+          "form_id": "CoberturaPECompleto21"
+        },
+        "body": {
+          "telefone_whatsapp": "",
+          "concluiu_entrada_comunidade": "",
+          "submitters_longitude": "-34.8942200",
+          "added_time": "16-Aug-2026 11:38:47",
+          "vapor": "false",
+          "municipio": "",
+          "entrou_comunidade": "",
+          "foto_casa": [
+            "https://drive.google.com/file/d/16WzHZqpezyqbJkYQnYAFULwQ35MxSD-Z/view?usp=drivesdk"
+          ],
+          "tipo_acao": "⁠Panfletagem",
+          "submitters_latitude": "-7.7727007",
+          "referrer_name": "",
+          "submitters_location": "Rua do Sossego, Espinheiro, Itapissuma, Região Geográfica Imediata do Recife, Região Metropolitana do Recife, Região Geográfica Intermediária do Recife, Pernambuco, Região Nordeste, 53700-000, Brasil",
+          "de_quem_casa": "",
+          "referrer_email": "coberturape046@centraldeengajamento.com.br"
+        },
+        "webhookUrl": "https://webhookn8n.tnledu.shop/webhook/zoho-forms-ingest",
+        "executionMode": "production"
+      }
+    ]
+  },
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "be948e3395efb1e363bbe2b3fd07ab4faf0260a188cbd76d59748393aacaaaad"
   }
 }
