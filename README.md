@@ -43,6 +43,7 @@ normalized (ou em `zoho_ingestion_errors`). O n8n só chama a RPC.
    - `migrations/005_zoho_anon_read.sql` — SELECT anon no registry (pro n8n ler `file_fields`)
    - `migrations/006_zoho_dashboard_view.sql` — view `zoho_vw_submissions_dashboard` (núcleo + `data_completa` + `foto_urls`)
    - `migrations/007_zoho_to_array_transform.sql` — transform genérico `to_array` (seleção única → caixa de seleção)
+   - `migrations/009_zoho_stable_id.sql` — id estável (`raw_submission_id`) + reprocess que preserva `id`
 2. Cadastre os forms existentes em `migrations/003_zoho_seed_registry.sql` (preencha os dados reais).
 3. Importe os workflows no n8n (Menu → Import from File):
    - `n8n/zoho-ingest-webhook.json`
@@ -204,6 +205,9 @@ Para re-aplicar um `mapeamento` corrigido sobre dados já gravados, rode
    cruza o `data` com o `file_fields` de hoje. Remover um campo de arquivo do
    `file_fields` faz os anexos históricos daquele campo sumirem da view (continuam
    no bucket e no `data_completa`).
+3. **`id` não é o identificador estável**: use `raw_submission_id`. O `id` era
+   regenerado pelo reprocessamento (DELETE+INSERT) até a migration 009; hoje ele é
+   preservado, mas qualquer consumidor deve ancorar em `raw_submission_id`.
 
 ## Webhook (A1)
 
@@ -263,8 +267,10 @@ SELECT zoho_reprocess_raw('<raw_submission_id>');
 SELECT zoho_reprocess_form('cadastro_campo_2026');
 ```
 
-As RPCs de reprocessamento apagam o resultado anterior (normalized/erros) e
-re-aplicam o mapeamento corrente a partir do raw imutável — nada se perde.
+As RPCs de reprocessamento re-aplicam o mapeamento corrente a partir do raw
+imutável — nada se perde. Desde a migration 009 o reprocessamento é um **UPSERT**
+em `raw_submission_id`: o `id` da submissão é **preservado** (não é mais regenerado),
+então referências feitas pelo `id` no dashboard não quebram.
 
 ## Dashboard
 
@@ -272,6 +278,15 @@ O dashboard lê **somente as views**, nunca `zoho_raw_submissions` ou o `jsonb` 
 - `zoho_vw_submissions_core` — núcleo comum (`nome`, `telefone`, `localizacao`, `latitude`, `longitude`) + `data_completa`.
 - `zoho_vw_submissions_dashboard` — all-in-one: núcleo tipado + `data_completa` (extras) + `foto_urls` (array de URLs públicas das fotos). Uma linha por submissão; o botão de fotos abre `foto_urls`.
 - Views por família: crie `zoho_vw_<familia>` filtrando por `form_family`/`form_id` e extraindo chaves extras tipadas.
+
+> **Identificador estável:** para referenciar uma submissão de forma duradoura
+> (ex.: anotações/edições no dashboard), use **`raw_submission_id`**, não `id`.
+> `raw_submission_id` é o id imutável do `zoho_raw_submissions` e não muda nem no
+> Repush (vira `duplicate`) nem no reprocessamento. O `id` é um uuid gerado na
+> gravação e era regenerado pelo reprocess até a migration 009 — ele agora é
+> preservado, mas `raw_submission_id` continua sendo a âncora segura. Para cruzar
+> com um export do Zoho, use a chave natural `submitted_at` + `latitude` +
+> `longitude` (+ `referrer_email`, quando houver).
 
 Para **criar um dashboard** (consumir os dados, inspecionar o jsonb, explicar o form pra IA): veja [DASHBOARD.md](./DASHBOARD.md).
 

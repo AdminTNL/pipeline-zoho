@@ -105,7 +105,7 @@ WHERE form_id = 'CoberturaPECompleto21' LIMIT 10;
 ```sql
 CREATE OR REPLACE VIEW zoho_vw_cobertura_pe AS
 SELECT
-  id, form_id, submitted_at,
+  id, raw_submission_id, form_id, submitted_at,
   data->>'localizacao' AS localizacao,
   (data->>'latitude')::float  AS latitude,
   (data->>'longitude')::float AS longitude,
@@ -116,6 +116,13 @@ SELECT
 FROM zoho_submissions_normalized
 WHERE form_id = 'CoberturaPECompleto21';
 ```
+
+> **Identificador estável:** ambas as views expõem **`raw_submission_id`**. Use ele
+> (não `id`) para referenciar uma submissão de forma duradoura — anotações, edições,
+> de-para com a sua ferramenta. `raw_submission_id` é o id imutável do
+> `zoho_raw_submissions` (não muda no Repush nem no reprocessamento). Para cruzar
+> com um export do Zoho, use a chave natural `submitted_at` + `latitude` +
+> `longitude` (+ `referrer_email`, quando houver).
 
 ## Nota sobre o `data_completa`
 
