@@ -10,7 +10,7 @@
 --   "Campo_No_Zoho": {"campo": "chave_padronizada", "transform": "only_digits"}
 --   "Campo_No_Zoho": {"campo": "chave_padronizada", "transform": "concat", "with": "Outro_Campo"}
 --
--- Transforms disponíveis: only_digits, to_float, to_int, trim, lower, upper, concat
+-- Transforms disponíveis: only_digits, to_float, to_int, trim, lower, upper, concat, to_array
 --
 -- `required` (jsonb): lista de chaves PADRONIZADAS obrigatórias.
 --   Default ["nome","telefone"]. Forms sem nome/telefone usam '[]'.

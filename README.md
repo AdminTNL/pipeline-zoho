@@ -42,6 +42,7 @@ normalized (ou em `zoho_ingestion_errors`). O n8n só chama a RPC.
    - `migrations/004_zoho_form_config.sql` — colunas `required` e `file_fields`
    - `migrations/005_zoho_anon_read.sql` — SELECT anon no registry (pro n8n ler `file_fields`)
    - `migrations/006_zoho_dashboard_view.sql` — view `zoho_vw_submissions_dashboard` (núcleo + `data_completa` + `foto_urls`)
+   - `migrations/007_zoho_to_array_transform.sql` — transform genérico `to_array` (seleção única → caixa de seleção)
 2. Cadastre os forms existentes em `migrations/003_zoho_seed_registry.sql` (preencha os dados reais).
 3. Importe os workflows no n8n (Menu → Import from File):
    - `n8n/zoho-ingest-webhook.json`
@@ -98,7 +99,13 @@ Submeta uma entrada de teste e confira:
 | `"Campo_Zoho": {"campo": "chave", "transform": "only_digits"}` | de-para + transform |
 | `"Campo_Zoho": {"campo": "chave", "transform": "concat", "with": "Outro_Campo"}` | concatena dois campos (opcional `"separator"`, default espaço) |
 
-Transforms disponíveis: `only_digits`, `to_float`, `to_int`, `trim`, `lower`, `upper`, `concat`.
+Transforms disponíveis: `only_digits`, `to_float`, `to_int`, `trim`, `lower`, `upper`, `concat`, `to_array`.
+
+`to_array` normaliza campos que viraram **caixa de seleção** (multi-seleção) no Zoho:
+string vira `[string]` (array de um elemento), array passa intocado, vazio vira `NULL`
+(chave ausente). Use quando um campo mudar de seleção única → caixa de seleção; assim o
+`data` fica uniformemente array e o dashboard lê sempre da mesma forma.
+
 Campos do payload fora do mapeamento viram **extras** dentro de `data` (visíveis em `data_completa`).
 Validação: os campos obrigatórios vêm da coluna `required` (ver abaixo).
 
