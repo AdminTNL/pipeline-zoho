@@ -9,7 +9,7 @@ offline). Adicionar um form novo é **configuração**, nunca código.
   webhook, reconciliação (Repush), reprocessamento, dashboard.
 - `DASHBOARD.md` — como consumir os dados: criar dashboard, inspecionar o jsonb e
   explicar a estrutura de um form (payload + mapeamento).
-- `migrations/` — schema + RPCs (001..006). Rodar em ordem no SQL Editor do Supabase.
+- `migrations/` — schema + RPCs (001..010). Rodar em ordem no SQL Editor do Supabase.
 - `n8n/` — workflow do webhook (`zoho-ingest-webhook.json`): ingest + branch de fotos.
 
 ## Convenções
@@ -26,3 +26,5 @@ offline). Adicionar um form novo é **configuração**, nunca código.
 - Parâmetros de RPC chamadas via PostgREST **não** usam prefixo `p_` (o PostgREST
   casa as chaves do JSON com os nomes dos argumentos).
 - Nomes de arquivo/objeto no bucket `zoho-anexos` seguem `<form_id>/<file_id>`.
+- **Deleção de submissão é soft** (`zoho_delete_submission` marca `deleted_at`; `zoho_restore_submission` desfaz). Nunca apagar fisicamente `zoho_raw_submissions` — ele é imutável e é o que impede o "Repush" de re-ingerir.
+- Em RPCs PL/pgSQL cujo parâmetro tem o mesmo nome de uma coluna, **qualifique a coluna E use `$1`** no WHERE (ex.: `WHERE zoho_submissions_normalized.raw_submission_id = $1`). Usar o nome do parâmetro vira variável e colide com a coluna (42702 "ambiguous") — mesmo padrão do `zoho_mark_synced` (002).

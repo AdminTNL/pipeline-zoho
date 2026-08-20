@@ -44,6 +44,7 @@ normalized (ou em `zoho_ingestion_errors`). O n8n só chama a RPC.
    - `migrations/006_zoho_dashboard_view.sql` — view `zoho_vw_submissions_dashboard` (núcleo + `data_completa` + `foto_urls`)
    - `migrations/007_zoho_to_array_transform.sql` — transform genérico `to_array` (seleção única → caixa de seleção)
    - `migrations/009_zoho_stable_id.sql` — id estável (`raw_submission_id`) + reprocess que preserva `id`
+   - `migrations/010_zoho_delete_submission.sql` — soft delete (`deleted_at` + `zoho_delete_submission`/`zoho_restore_submission`)
 2. Cadastre os forms existentes em `migrations/003_zoho_seed_registry.sql` (preencha os dados reais).
 3. Importe os workflows no n8n (Menu → Import from File):
    - `n8n/zoho-ingest-webhook.json`
@@ -271,6 +272,42 @@ As RPCs de reprocessamento re-aplicam o mapeamento corrente a partir do raw
 imutável — nada se perde. Desde a migration 009 o reprocessamento é um **UPSERT**
 em `raw_submission_id`: o `id` da submissão é **preservado** (não é mais regenerado),
 então referências feitas pelo `id` no dashboard não quebram.
+
+## Deleção de submissões (soft delete)
+
+Deletar uma submissão é uma operação **soft**: em vez de apagar fisicamente, a
+migration 010 marca `zoho_submissions_normalized.deleted_at` e as views escondem a linha.
+
+```sql
+-- Marca como deletada (some das views):
+SELECT zoho_delete_submission('<raw_submission_id>');
+
+-- Desfaz (restaura — só o registro; as fotos NÃO voltam):
+SELECT zoho_restore_submission('<raw_submission_id>');
+```
+
+Garantias:
+
+- **`raw` permanece imutável** — o payload original continua em
+  `zoho_raw_submissions` (auditoria preservada). Nada é perdido de verdade.
+- **Repush não re-ingere**: como o `raw` (e sua chave de idempotência) continua
+  lá, um "Repush" do Zoho vira `duplicate` e a submissão soft-deletada **não
+  volta** ao dashboard.
+- **Reprocess não ressuscita**: `zoho_normalize_from_raw` (009) faz `UPSERT`
+  que só atualiza `form_id`/`data`, sem tocar em `deleted_at` — a linha continua
+  escondida.
+- **Privilégio restrito**: as RPCs de delete/restore têm `EXECUTE` apenas para
+  `service_role` (o painel admin); `anon`/`authenticated` são bloqueados
+  (`REVOKE FROM PUBLIC, anon, authenticated`).
+- **Fotos**: SQL não alcança o Storage, então a remoção dos arquivos em
+  `zoho-anexos` é responsabilidade do consumidor (o painel central apaga via
+  Storage API antes de chamar `zoho_delete_submission`). Restaurar recupera o
+  registro, mas não os arquivos.
+
+> **Segurança:** os `WHERE` das RPCs qualificam a coluna **e usam `$1`**
+> (`WHERE zoho_submissions_normalized.raw_submission_id = $1`). Em PL/pgSQL o
+> nome do parâmetro vira variável e colide com a coluna de mesmo nome (42702
+> "ambiguous") — mesmo padrão do `zoho_mark_synced` da 002.
 
 ## Dashboard
 
