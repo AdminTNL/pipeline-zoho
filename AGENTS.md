@@ -9,8 +9,29 @@ offline). Adicionar um form novo é **configuração**, nunca código.
   webhook, reconciliação (Repush), reprocessamento, dashboard.
 - `DASHBOARD.md` — como consumir os dados: criar dashboard, inspecionar o jsonb e
   explicar a estrutura de um form (payload + mapeamento).
-- `migrations/` — schema + RPCs (001..010). Rodar em ordem no SQL Editor do Supabase.
-- `n8n/` — workflow do webhook (`zoho-ingest-webhook.json`): ingest + branch de fotos.
+- `migrations/` — schema + RPCs (001..012). Rodar em ordem no SQL Editor do Supabase.
+- `n8n/` — espelhos locais (`{nodes, connections, meta}`, formato de
+  export do editor) da instância real, atualizados via `query-n8n`/
+  `escrita-n8n` depois de cada mudança em produção — nunca editados à mão
+  primeiro. **`zoho-forms-ingest-with-backup-sync.json`** é o fluxo de
+  ingestão **oficial em produção** (`Zoho Forms Ingest (produção)`, id
+  `hkFJBLTHiHSGQZU5`, path `zoho-forms-ingest-parallel`) desde 2026-08-19 —
+  chama a RPC via sub-workflow (`Execute Workflow`), tem check antecipado de
+  dedup + checagem de foto por `file_id` + dual-write Supabase/R2 + avisa o
+  D1 (`Mark synced`). `zoho-ingest-webhook.json` é o fluxo de produção
+  **antigo** (`Zoho Forms Ingest (Webhook)`, id `DXpRe6n1HoRtcxTM`) — **está
+  inativo**, mantido só como histórico/rollback (chamava a RPC direto,
+  sem sub-workflow). `zoho-ingest-core.json` é o sub-workflow compartilhado
+  da RPC (`Zoho Ingest Core (backup)`). `zoho-forms-ingest-backup.json` é o
+  fluxo do cron de backup (`Zoho Forms Ingest — Backup Replay`, id
+  `RhHusynIWIx5PmPX`, path `zoho-forms-backup-replay`) — recebe reenvios do
+  Worker (`worker/`) pra submissões que o caminho ao vivo não confirmou.
+  Detalhe completo da arquitetura, do corte pra fluxo único e do que ainda
+  falta: ver [worker/README.md](./worker/README.md).
+- `worker/` — Cloudflare Worker + D1: backup de ingestão pra cobrir quedas
+  do n8n. Ver [worker/README.md](./worker/README.md). Também documenta a
+  migração de anexos Supabase Storage → R2, ver
+  [worker/R2-MIGRATION.md](./worker/R2-MIGRATION.md).
 
 ## Convenções
 

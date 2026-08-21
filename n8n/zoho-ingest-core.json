@@ -1,0 +1,111 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -800,
+        0
+      ],
+      "name": "When Executed by Another Workflow",
+      "id": "fef53165-b7da-4398-b42e-814cefc5ad02"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://database.tnledu.shop/rest/v1/rpc/zoho_ingest_submission",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json) }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "text"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        -544,
+        0
+      ],
+      "name": "Ingest (RPC)",
+      "retryOnFail": true,
+      "onError": "continueErrorOutput",
+      "id": "4a45464b-bf5c-48c2-ad1e-3f44ede7da3a",
+      "credentials": {
+        "supabaseApi": {
+          "id": "2s75u9F7plz4ovFN",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: { ok: true, http: 'success', rpc_response: $json } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -288,
+        -96
+      ],
+      "name": "Build result: ok",
+      "id": "f06cef81-7920-49e4-9591-ce06e768ab0f"
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: { ok: false, http: 'error', error: $json } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -288,
+        96
+      ],
+      "name": "Build result: error",
+      "id": "468d395f-81c4-4217-8ee1-70c76146e2d9"
+    }
+  ],
+  "connections": {
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "Ingest (RPC)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ingest (RPC)": {
+      "main": [
+        [
+          {
+            "node": "Build result: ok",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build result: error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "meta": {
+    "templateCredsSetupCompleted": true
+  }
+}

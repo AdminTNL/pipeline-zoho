@@ -1,0 +1,30 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "zoho-forms-backup",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-08-19",
+  "observability": {
+    "enabled": true
+  },
+  "vars": {
+    "N8N_BACKUP_URL": "https://webhookn8n.tnledu.shop/webhook/zoho-forms-backup-replay",
+    "N8N_INGEST_URL": "https://webhookn8n.tnledu.shop/webhook/zoho-forms-ingest-parallel"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "zoho-backup",
+      "database_id": "110895a6-6806-4af8-95a6-06524fc1671f",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "PHOTOS",
+      "bucket_name": "zoho-anexos"
+    }
+  ],
+  "triggers": {
+    "crons": ["0 * * * *"]
+  }
+}

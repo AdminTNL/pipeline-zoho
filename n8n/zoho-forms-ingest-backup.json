@@ -1,0 +1,593 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "zoho-forms-backup-replay",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -1600,
+        176
+      ],
+      "name": "Webhook",
+      "webhookId": "zoho-forms-backup-replay",
+      "id": "6b886824-e326-4531-a1e1-be5acf3fd62e"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "9c1b8f0a-1111-4a2b-9c3d-000000000001",
+              "leftValue": "={{ $json.headers['x-backup-token'] }}",
+              "rightValue": "aff2c54c4f6b4eca2858183212273646f73513aac70b5446a321c31322d35d6e",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -1344,
+        176
+      ],
+      "name": "Check backup token",
+      "id": "8cab686b-964e-4b18-9f50-b2b6c5be81ac"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { ok: false, error: 'unauthorized' } }}",
+        "options": {
+          "responseCode": 401
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        -1088,
+        320
+      ],
+      "name": "Respond: unauthorized",
+      "id": "2547f935-41a7-4541-bdef-2edefd0e3e3c"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $json.body || {};\nconst payload = body.payload || {};\nconst formId = body.form_id || 'CADASTRE_O_FORM_ID';\n\nfunction parseZohoDate(s) {\n  if (!s) return null;\n  const m = String(s).match(/(\\d{1,2})-([A-Za-z]{3})-(\\d{4})\\s+(\\d{1,2}):(\\d{2}):(\\d{2})/);\n  if (!m) return null;\n  const months = { Jan: 0, Feb: 1, Mar: 2, Apr: 3, May: 4, Jun: 5, Jul: 6, Aug: 7, Sep: 8, Oct: 9, Nov: 10, Dec: 11 };\n  return new Date(Date.UTC(+m[3], months[m[2]], +m[1], +m[4], +m[5], +m[6])).toISOString();\n}\n\nreturn [{\n  json: {\n    form_id: formId,\n    zoho_submission_id: null,\n    submitted_at: parseZohoDate(payload.Added_Time || payload.added_time),\n    payload: payload,\n    source: 'backup_replay'\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1088,
+        96
+      ],
+      "name": "Extract submission",
+      "id": "5d9e4594-382f-4f07-8136-7fda5949c03d"
+    },
+    {
+      "parameters": {
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "value": "qJsTKWztz6IRjWRB",
+          "mode": "list",
+          "cachedResultName": "Zoho Ingest Core (backup)"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.2,
+      "position": [
+        -832,
+        0
+      ],
+      "name": "Zoho Ingest Core",
+      "id": "93fd803d-35dc-4942-bb88-1152a0d70fb5"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://zoho-forms-backup.gentle-pine-bedc.workers.dev/internal/check-synced",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-internal-token",
+              "value": "c1ef0b3eb63d979e265a9f083c084996165c29fba60213e958e1156d186cd9c0"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ form_id: $json.form_id, payload: $json.payload }) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        -1088,
+        -96
+      ],
+      "name": "Check already synced",
+      "id": "72a9d38c-db0f-4099-8171-c84c420cd44c",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "6f5e4d3c-2b1a-4c9d-8e7f-000000000002",
+              "leftValue": "={{ String($json.synced) }}",
+              "rightValue": "true",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -832,
+        -96
+      ],
+      "name": "Already synced?",
+      "id": "12df2f10-456f-4f56-839d-529757c06ef9"
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: { ok: true, status: 'already_synced', exec_id: $execution.id, flow_id: $workflow.id } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -832,
+        -224
+      ],
+      "name": "Build already-synced response",
+      "id": "acd18cff-8cc4-49b6-acfc-e95ca838e2bd"
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: $('Extract submission').item.json }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -832,
+        96
+      ],
+      "name": "Restore submission data",
+      "id": "d3c53e1b-5c0e-4d16-947e-7f6d0dd3d9d3"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ Object.assign({}, $json, { exec_id: $execution.id, flow_id: $workflow.id }) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        -576,
+        0
+      ],
+      "name": "Respond: result",
+      "id": "eeb4d748-0912-4599-a651-3da116e3feab"
+    },
+    {
+      "parameters": {
+        "url": "=https://database.tnledu.shop/rest/v1/zoho_form_registry?select=file_fields&form_id=eq.{{ $json.form_id }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        -832,
+        288
+      ],
+      "name": "Get form config",
+      "id": "430a7364-ea7d-4f47-b408-505491d7343b",
+      "credentials": {
+        "supabaseApi": {
+          "id": "2s75u9F7plz4ovFN",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const extract = $('Extract submission').first().json;\nconst payload = extract.payload || {};\nconst formId = extract.form_id;\n\n// 'Get form config' pode vir como objeto unico (json) ou array de linhas.\nlet fileFields = [];\nconst cfg = $json;\nif (Array.isArray(cfg)) {\n  fileFields = (cfg[0] && cfg[0].file_fields) || [];\n} else if (cfg && Array.isArray(cfg.file_fields)) {\n  fileFields = cfg.file_fields;\n}\n\n// extrai o file_id da URL do Google Drive\n// ex.: https://drive.google.com/file/d/<FILE_ID>/view?usp=drivesdk\nfunction extractFileId(url) {\n  const m = String(url).match(/\\/file\\/d\\/([^\\/?]+)/);\n  return m ? m[1] : null;\n}\n\nconst items = [];\nfor (const field of fileFields) {\n  const val = payload[field];\n  if (!val) continue;\n  const urls = Array.isArray(val) ? val : [val];\n  for (const url of urls) {\n    const fileId = extractFileId(url);\n    if (!fileId) continue;\n    items.push({\n      json: {\n        form_id: formId,\n        field: field,\n        file_id: fileId\n      }\n    });\n  }\n}\n\nreturn items;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -576,
+        288
+      ],
+      "name": "Prepare photos",
+      "id": "5ae5654d-dc2b-4a81-ba23-2dff6863f581"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        -320,
+        288
+      ],
+      "name": "Loop over photos",
+      "id": "7282dc96-9aa1-4354-9ace-6728b5b41e69"
+    },
+    {
+      "parameters": {
+        "method": "HEAD",
+        "url": "=https://database.tnledu.shop/storage/v1/object/public/zoho-anexos/{{ $json.form_id }}/{{ $json.file_id }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        -64,
+        288
+      ],
+      "name": "Check photo exists",
+      "id": "c8d7e6f5-4a3b-4c2d-9e1f-000000000005",
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "operation": "download",
+        "fileId": {
+          "__rl": true,
+          "value": "={{ $json.file_id }}",
+          "mode": "id"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        -64,
+        304
+      ],
+      "name": "Download photo",
+      "id": "ea700f95-ac4b-4018-93d9-c5dfb786f0c5",
+      "onError": "continueErrorOutput",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "mJD5RTaU4QynfvNU",
+          "name": "Google Drive account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://database.tnledu.shop/storage/v1/object/zoho-anexos/{{ $('Loop over photos').item.json.form_id }}/{{ $('Loop over photos').item.json.file_id }}",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendBody": true,
+        "contentType": "binaryData",
+        "inputDataFieldName": "data",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        256,
+        304
+      ],
+      "name": "Upload photo",
+      "id": "5e564a62-d025-4ba3-b596-779fc83ba4e3",
+      "onError": "continueErrorOutput",
+      "credentials": {
+        "supabaseApi": {
+          "id": "2s75u9F7plz4ovFN",
+          "name": "Supabase account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://zoho-forms-backup.gentle-pine-bedc.workers.dev/internal/upload-asset?form_id={{ $('Loop over photos').item.json.form_id }}&file_id={{ $('Loop over photos').item.json.file_id }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-upload-token",
+              "value": "8fcdc87f812138a1ee9490f13bd0858a727f7a8b59e82d1aa3fd20b675fb3da2"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "binaryData",
+        "inputDataFieldName": "data",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        112,
+        464
+      ],
+      "name": "Upload photo (R2)",
+      "id": "04f6d090-aa35-4e12-94cc-33944f5ff757",
+      "retryOnFail": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "operation": "deleteFile",
+        "fileId": {
+          "__rl": true,
+          "value": "={{ $('Download photo').first().json.file_id }}",
+          "mode": "id"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        640,
+        320
+      ],
+      "name": "Delete a file",
+      "id": "85bf7449-c6be-4c16-a27b-a4c162f68e6a",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "mJD5RTaU4QynfvNU",
+          "name": "Google Drive account 2"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Check backup token",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check backup token": {
+      "main": [
+        [
+          {
+            "node": "Extract submission",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond: unauthorized",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract submission": {
+      "main": [
+        [
+          {
+            "node": "Check already synced",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Get form config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check already synced": {
+      "main": [
+        [
+          {
+            "node": "Already synced?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Already synced?": {
+      "main": [
+        [
+          {
+            "node": "Build already-synced response",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Restore submission data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Restore submission data": {
+      "main": [
+        [
+          {
+            "node": "Zoho Ingest Core",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build already-synced response": {
+      "main": [
+        [
+          {
+            "node": "Respond: result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Zoho Ingest Core": {
+      "main": [
+        [
+          {
+            "node": "Respond: result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get form config": {
+      "main": [
+        [
+          {
+            "node": "Prepare photos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare photos": {
+      "main": [
+        [
+          {
+            "node": "Loop over photos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop over photos": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Check photo exists",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check photo exists": {
+      "main": [
+        [
+          {
+            "node": "Loop over photos",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Download photo",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download photo": {
+      "main": [
+        [
+          {
+            "node": "Upload photo",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Upload photo (R2)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Loop over photos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upload photo": {
+      "main": [
+        [
+          {
+            "node": "Delete a file",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Loop over photos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Delete a file": {
+      "main": [
+        [
+          {
+            "node": "Loop over photos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "meta": {
+    "templateCredsSetupCompleted": true
+  }
+}

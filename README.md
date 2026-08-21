@@ -158,6 +158,12 @@ A URL pública da foto é derivável a partir do `file_id` + `form_id`:
 https://database.tnledu.shop/storage/v1/object/public/zoho-anexos/<form_id>/<file_id>
 ```
 
+> **Migração para R2 em andamento**: a VPS do Supabase self-hosted não
+> comporta o volume de anexos previsto. O histórico já foi replicado para
+> um bucket R2 (`https://assets-pe.centraldeengajamento.com.br/<form_id>/<file_id>`,
+> mesma organização de chave). O fluxo de upload ainda escreve no Supabase
+> Storage até o corte ser autorizado — ver [worker/R2-MIGRATION.md](./worker/R2-MIGRATION.md).
+
 ### Como achar o `form_id` (form_link_name)
 
 O `form_id` do registry é o **`form_link_name`** do form no Zoho (identificador do form), não o "Form ID" numérico.
@@ -243,6 +249,19 @@ Esse repush é o substituto do polling: sem duplicidade e sem código novo.
   `zoho_ingest_submission` (padrão já usado no projeto `supabase-chega-junto`).
 - **Zoho Analytics API**: as submissões vivem no Zoho Analytics; a API dele
   (`analyticsapi.zoho.com`) lê a tabela do form programaticamente.
+
+## Backup de ingestão (Cloudflare Worker)
+
+O n8n roda numa VPS (Docker Swarm/Portainer) que eventualmente reinicia por
+alguns minutos — o suficiente para perder uma submissão que o Zoho não
+reenvia sozinho. Cada form passa a enviar a mesma submissão **também** para
+um Cloudflare Worker (`worker/`), que grava a chegada num D1 e, de hora em
+hora, reenvia pro n8n só o que ainda não foi confirmado como processado. A
+ingestão no Postgres já é idempotente por si só (dedup determinística +
+`ON CONFLICT DO NOTHING`), então esse backup é uma camada de eficiência/
+resiliência, não a fonte de verdade de dedup. Detalhes de arquitetura,
+runbook de deploy e o que falta configurar no Zoho: ver
+[worker/README.md](./worker/README.md).
 
 ## Métricas / observabilidade
 
